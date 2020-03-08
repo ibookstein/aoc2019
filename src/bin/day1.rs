@@ -1,3 +1,5 @@
+use aoc2019::aoc_input::get_input;
+
 fn required_fuel(module_mass: u64) -> u64 {
     (module_mass / 3).saturating_sub(2)
 }
@@ -14,7 +16,7 @@ fn total_required_fuel(module_mass: u64) -> u64 {
 }
 
 fn main() {
-    let input = aoc2019::get_input(1).expect("Failed getting input");
+    let input = get_input(1);
     let module_masses: Vec<_> = input.lines().map(|n| n.parse::<u64>().unwrap()).collect();
 
     let modules_fuel = module_masses
