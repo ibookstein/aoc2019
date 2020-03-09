@@ -1,29 +1,5 @@
 use aoc2019::aoc_input::get_input;
-
-struct DigitsIterator {
-    n: usize,
-    radix: usize,
-}
-
-impl DigitsIterator {
-    fn new(n: usize, radix: usize) -> DigitsIterator {
-        DigitsIterator { n, radix }
-    }
-}
-
-impl Iterator for DigitsIterator {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.n != 0 {
-            let digit = self.n % self.radix;
-            self.n /= self.radix;
-            Some(digit)
-        } else {
-            None
-        }
-    }
-}
+use aoc2019::digits::digits;
 
 fn parse_range(range_str: &str) -> (usize, usize) {
     let nums: Vec<usize> = range_str.split('-').map(|s| s.parse().unwrap()).collect();
@@ -75,18 +51,18 @@ fn main() {
     let mut extra_rule_password_count: usize = 0;
 
     for current in start..=end {
-        let digits: Vec<usize> = DigitsIterator::new(current, 10).collect();
-        assert_eq!(digits.len(), 6);
-        if !two_same_adjacent_digits(&digits) {
+        let current_digits = digits(current, 10);
+        assert_eq!(current_digits.len(), 6);
+        if !two_same_adjacent_digits(&current_digits) {
             continue;
         }
-        if !digits_ascending_ltr(&digits) {
+        if !digits_ascending_ltr(&current_digits) {
             continue;
         }
 
         password_count += 1;
 
-        if !two_same_adjacent_digits_exact(&digits) {
+        if !two_same_adjacent_digits_exact(&current_digits) {
             continue;
         }
 
