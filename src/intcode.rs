@@ -22,11 +22,16 @@ struct Operand {
     value: isize,
 }
 
+#[derive(Debug)]
 enum Operation {
     Add,
     Multiply,
     Input,
     Output,
+    JumpTrue,
+    JumpFalse,
+    LessThan,
+    Equals,
     Halt,
 }
 
@@ -108,6 +113,10 @@ impl IntcodeMachine {
             2 => (Operation::Multiply, 3),
             3 => (Operation::Input, 1),
             4 => (Operation::Output, 1),
+            5 => (Operation::JumpTrue, 2),
+            6 => (Operation::JumpFalse, 2),
+            7 => (Operation::LessThan, 3),
+            8 => (Operation::Equals, 3),
             99 => (Operation::Halt, 0),
             _ => return Err(IntcodeError::InvalidOpcodeOperation),
         };
@@ -139,6 +148,14 @@ impl IntcodeMachine {
         }
     }
 
+    fn jump_conditional(&mut self, condition: bool, target: isize) -> IntcodeResult<()> {
+        if condition {
+            self.verify_addr(target)?;
+            self.pc = target;
+        }
+        Ok(())
+    }
+
     fn tick(&mut self) -> IntcodeResult<bool> {
         let opcode = self.read_opcode()?;
         let mut halt = false;
@@ -159,6 +176,24 @@ impl IntcodeMachine {
             Operation::Output => {
                 let value = self.load(&opcode.operands[0])?;
                 self.output.push_back(value);
+            }
+            Operation::JumpTrue => {
+                let condition = self.load(&opcode.operands[0])?;
+                let target = self.load(&opcode.operands[1])?;
+                self.jump_conditional(condition != 0, target)?;
+            }
+            Operation::JumpFalse => {
+                let condition = self.load(&opcode.operands[0])?;
+                let target = self.load(&opcode.operands[1])?;
+                self.jump_conditional(condition == 0, target)?;
+            }
+            Operation::LessThan => {
+                let value = self.load(&opcode.operands[0])? < self.load(&opcode.operands[1])?;
+                self.store(&opcode.operands[2], value as isize)?;
+            }
+            Operation::Equals => {
+                let value = self.load(&opcode.operands[0])? == self.load(&opcode.operands[1])?;
+                self.store(&opcode.operands[2], value as isize)?;
             }
             Operation::Halt => {
                 halt = true;
