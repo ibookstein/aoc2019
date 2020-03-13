@@ -5,7 +5,6 @@ use std::collections::VecDeque;
 pub enum IntcodeError {
     InvalidOpcodeOperation,
     NegativeOpcode,
-    AddressOutOfBounds,
     InvalidAddressingMode,
     NegativeAddress,
     InvalidStoreAddressingMode,
@@ -22,6 +21,7 @@ pub enum StopStatus {
 enum AddressingMode {
     AbsoluteAddress,
     Immediate,
+    BasePointerRelative,
 }
 
 struct Operand {
@@ -39,6 +39,7 @@ enum Operation {
     JumpFalse,
     LessThan,
     Equals,
+    AdjustBasePointer,
     Halt,
 }
 
@@ -56,12 +57,14 @@ pub struct IntcodeMachine {
     pub input: Stream,
     pub output: Stream,
     pc: isize,
+    bp: isize,
 }
 
 fn parse_addressing_mode(digit: usize) -> IntcodeResult<AddressingMode> {
     match digit {
         0 => Ok(AddressingMode::AbsoluteAddress),
         1 => Ok(AddressingMode::Immediate),
+        2 => Ok(AddressingMode::BasePointerRelative),
         _ => Err(IntcodeError::InvalidAddressingMode),
     }
 }
@@ -73,23 +76,23 @@ impl IntcodeMachine {
             input,
             output: Stream::new(),
             pc: 0,
+            bp: 0,
         }
     }
 
-    fn verify_addr(&self, addr: isize) -> IntcodeResult<usize> {
+    fn verify_addr(&mut self, addr: isize) -> IntcodeResult<usize> {
         if addr < 0 {
             return Err(IntcodeError::NegativeAddress);
         }
 
         let addr = addr as usize;
         if addr >= self.tape.len() {
-            Err(IntcodeError::AddressOutOfBounds)
-        } else {
-            Ok(addr)
+            self.tape.resize(addr + 1, 0);
         }
+        Ok(addr)
     }
 
-    fn read_addr(&self, addr: isize) -> IntcodeResult<isize> {
+    fn read_addr(&mut self, addr: isize) -> IntcodeResult<isize> {
         let addr = self.verify_addr(addr)?;
         Ok(self.tape[addr])
     }
@@ -124,6 +127,7 @@ impl IntcodeMachine {
             6 => (Operation::JumpFalse, 2),
             7 => (Operation::LessThan, 3),
             8 => (Operation::Equals, 3),
+            9 => (Operation::AdjustBasePointer, 1),
             99 => (Operation::Halt, 0),
             _ => return Err(IntcodeError::InvalidOpcodeOperation),
         };
@@ -141,16 +145,18 @@ impl IntcodeMachine {
         })
     }
 
-    fn load(&self, op: &Operand) -> IntcodeResult<isize> {
+    fn load(&mut self, op: &Operand) -> IntcodeResult<isize> {
         match op.mode {
             AddressingMode::AbsoluteAddress => Ok(self.read_addr(op.value)?),
             AddressingMode::Immediate => Ok(op.value),
+            AddressingMode::BasePointerRelative => Ok(self.read_addr(self.bp + op.value)?),
         }
     }
 
     fn store(&mut self, op: &Operand, value: isize) -> IntcodeResult<()> {
         match op.mode {
             AddressingMode::AbsoluteAddress => Ok(self.write_addr(op.value, value)?),
+            AddressingMode::BasePointerRelative => Ok(self.write_addr(self.bp + op.value, value)?),
             AddressingMode::Immediate => Err(IntcodeError::InvalidStoreAddressingMode),
         }
     }
@@ -206,6 +212,11 @@ impl IntcodeMachine {
             Operation::Equals => {
                 let value = self.load(&opcode.operands[0])? == self.load(&opcode.operands[1])?;
                 self.store(&opcode.operands[2], value as isize)?;
+            }
+            Operation::AdjustBasePointer => {
+                let newbp = self.bp + self.load(&opcode.operands[0])?;
+                self.verify_addr(newbp)?;
+                self.bp = newbp;
             }
             Operation::Halt => {
                 self.pc = start_pc;
