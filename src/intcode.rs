@@ -9,7 +9,14 @@ pub enum IntcodeError {
     InvalidAddressingMode,
     NegativeAddress,
     InvalidStoreAddressingMode,
-    EndOfInput,
+    DidNotRunToCompletion,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum StopStatus {
+    Running,
+    Halted,
+    BlockedOnInput,
 }
 
 enum AddressingMode {
@@ -156,9 +163,9 @@ impl IntcodeMachine {
         Ok(())
     }
 
-    fn tick(&mut self) -> IntcodeResult<bool> {
+    fn tick(&mut self) -> IntcodeResult<StopStatus> {
+        let start_pc = self.pc;
         let opcode = self.read_opcode()?;
-        let mut halt = false;
 
         match opcode.operation {
             Operation::Add => {
@@ -170,8 +177,13 @@ impl IntcodeMachine {
                 self.store(&opcode.operands[2], value)?;
             }
             Operation::Input => {
-                let value = self.input.pop_front().ok_or(IntcodeError::EndOfInput)?;
-                self.store(&opcode.operands[0], value)?;
+                match self.input.pop_front() {
+                    Some(value) => self.store(&opcode.operands[0], value)?,
+                    None => {
+                        self.pc = start_pc;
+                        return Ok(StopStatus::BlockedOnInput);
+                    }
+                };
             }
             Operation::Output => {
                 let value = self.load(&opcode.operands[0])?;
@@ -196,20 +208,28 @@ impl IntcodeMachine {
                 self.store(&opcode.operands[2], value as isize)?;
             }
             Operation::Halt => {
-                halt = true;
+                self.pc = start_pc;
+                return Ok(StopStatus::Halted);
             }
         };
 
-        Ok(halt)
+        Ok(StopStatus::Running)
     }
 
-    pub fn run(&mut self) -> IntcodeResult<()> {
+    pub fn run(&mut self) -> IntcodeResult<StopStatus> {
         loop {
             match self.tick() {
+                Ok(StopStatus::Running) => continue,
+                Ok(status) => return Ok(status),
                 Err(e) => return Err(e),
-                Ok(true) => return Ok(()),
-                Ok(false) => continue,
             }
+        }
+    }
+
+    pub fn run_to_completion(&mut self) -> IntcodeResult<()> {
+        match self.run()? {
+            StopStatus::Halted => Ok(()),
+            _ => Err(IntcodeError::DidNotRunToCompletion),
         }
     }
 }

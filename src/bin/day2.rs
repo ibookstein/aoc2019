@@ -7,7 +7,7 @@ fn run_program(original: &Tape, noun: isize, verb: isize) -> isize {
     tape[2] = verb;
 
     let mut machine = IntcodeMachine::new(tape, Stream::new());
-    match machine.run() {
+    match machine.run_to_completion() {
         Ok(_) => (),
         Err(err) => panic!("IntcodeMachine error: {:?}", err),
     }

@@ -6,7 +6,7 @@ fn run_program(tape: &Tape, system_id: isize) -> Stream {
     input.push_back(system_id);
 
     let mut machine = IntcodeMachine::new(tape.clone(), input);
-    match machine.run() {
+    match machine.run_to_completion() {
         Ok(_) => (),
         Err(err) => panic!("IntcodeMachine error: {:?}", err),
     }
