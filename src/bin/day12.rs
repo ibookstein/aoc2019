@@ -1,5 +1,7 @@
 use aoc2019::aoc_input::get_input;
+use num_integer::lcm;
 use regex::Regex;
+use std::cmp::max;
 use std::num::ParseIntError;
 use std::ops::{Add, AddAssign};
 use std::str::FromStr;
@@ -128,16 +130,14 @@ impl Body {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Simulation {
-    time: usize,
     bodies: Vec<Option<Body>>,
 }
 
 impl Simulation {
     fn new(bodies: Vec<Body>) -> Self {
         Simulation {
-            time: 0,
             bodies: bodies.iter().map(|b| Some(*b)).collect(),
         }
     }
@@ -153,7 +153,6 @@ impl Simulation {
         for body in self.bodies.iter_mut() {
             body.as_mut().unwrap().move_by_velocity();
         }
-        self.time += 1;
     }
 
     fn ticks(&mut self, n: usize) {
@@ -168,6 +167,17 @@ impl Simulation {
             .map(|b| b.as_ref().unwrap().total_energy())
             .sum()
     }
+
+    fn project_axis(&self, axis: usize) -> Self {
+        let mut bodies = self.bodies.clone();
+        for body in bodies.iter_mut() {
+            let body = body.as_mut().unwrap();
+            for i in (0..DIMENSIONS).filter(|d| *d != axis) {
+                body.position.x[i] = 0;
+            }
+        }
+        Simulation { bodies }
+    }
 }
 
 fn parse_input(input: &str) -> Vec<Body> {
@@ -176,6 +186,60 @@ fn parse_input(input: &str) -> Vec<Body> {
         .lines()
         .map(|line| Body::new_at_rest(line.parse().unwrap()))
         .collect()
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct CycleInfo {
+    start_index: usize,
+    cycle_length: usize,
+}
+
+// https://en.wikipedia.org/wiki/Cycle_detection#Brent's_algorithm
+fn brent_cycle_detect(initial_state: &Simulation) -> CycleInfo {
+    let mut tortoise = initial_state.clone();
+    let mut hare = initial_state.clone();
+    hare.tick();
+
+    let mut power = 1usize;
+    let mut cycle_length = 1usize;
+
+    while tortoise != hare {
+        if power == cycle_length {
+            tortoise = hare.clone();
+            power *= 2;
+            cycle_length = 0;
+        }
+        hare.tick();
+        cycle_length += 1;
+    }
+
+    tortoise = initial_state.clone();
+    hare = initial_state.clone();
+    hare.ticks(cycle_length);
+
+    let mut start_index = 0usize;
+    while tortoise != hare {
+        tortoise.tick();
+        hare.tick();
+        start_index += 1;
+    }
+
+    CycleInfo {
+        start_index: start_index,
+        cycle_length: cycle_length,
+    }
+}
+
+fn compute_time_until_repetition(initial_state: &Simulation) -> usize {
+    let cycle_infos: Vec<_> = (0..DIMENSIONS)
+        .map(|d| brent_cycle_detect(&initial_state.project_axis(d)))
+        .collect();
+
+    let start_index = cycle_infos.iter().fold(0, |acc, x| max(acc, x.start_index));
+    let cycle_length = cycle_infos
+        .iter()
+        .fold(1, |acc, x| lcm(acc, x.cycle_length));
+    start_index + cycle_length
 }
 
 fn main() {
@@ -188,5 +252,11 @@ fn main() {
         "Total energy after {} time steps: {}",
         time_steps,
         sim.total_energy()
+    );
+
+    let sim = Simulation::new(parse_input(&input));
+    println!(
+        "Time until repetition: {}",
+        compute_time_until_repetition(&sim)
     );
 }
