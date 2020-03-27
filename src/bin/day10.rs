@@ -205,7 +205,7 @@ fn find_ith_annihilated_asteroid(
         }
     }
 
-    return laser_round_robin[idx];
+    laser_round_robin[idx]
 }
 
 fn main() {

@@ -225,8 +225,8 @@ fn brent_cycle_detect(initial_state: &Simulation) -> CycleInfo {
     }
 
     CycleInfo {
-        start_index: start_index,
-        cycle_length: cycle_length,
+        start_index,
+        cycle_length,
     }
 }
 

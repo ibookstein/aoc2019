@@ -27,7 +27,7 @@ struct Pipeline {
 
 impl Pipeline {
     fn new(
-        program: &Tape,
+        program: Tape,
         phase_settings: Vec<&isize>,
         first_input: StreamRef,
         last_output: StreamRef,
@@ -54,10 +54,9 @@ impl Pipeline {
     }
 
     fn completed(&self) -> bool {
-        return self
-            .pipeline
+        self.pipeline
             .iter()
-            .all(|ms| ms.status == StopStatus::Halted);
+            .all(|ms| ms.status == StopStatus::Halted)
     }
 
     fn run_to_completion(&mut self) {
@@ -69,7 +68,7 @@ impl Pipeline {
     }
 }
 
-fn calculate_thruster_signal_linear(program: &Tape, phase_settings: Vec<&isize>) -> isize {
+fn calculate_thruster_signal_linear(program: Tape, phase_settings: Vec<&isize>) -> isize {
     let input = new_stream_ref();
     let output = new_stream_ref();
     let mut pipeline = Pipeline::new(program, phase_settings, input.clone(), output.clone());
@@ -81,7 +80,7 @@ fn calculate_thruster_signal_linear(program: &Tape, phase_settings: Vec<&isize>)
     signal
 }
 
-fn calculate_thruster_signal_feedback(program: &Tape, phase_settings: Vec<&isize>) -> isize {
+fn calculate_thruster_signal_feedback(program: Tape, phase_settings: Vec<&isize>) -> isize {
     let inout = new_stream_ref();
     let mut pipeline = Pipeline::new(program, phase_settings, inout.clone(), inout.clone());
 
@@ -95,12 +94,12 @@ fn calculate_thruster_signal_feedback(program: &Tape, phase_settings: Vec<&isize
 fn calculate_max_thruster_signal(
     program: &Tape,
     phase_settings: Vec<isize>,
-    func: impl Fn(&Tape, Vec<&isize>) -> isize,
+    func: impl Fn(Tape, Vec<&isize>) -> isize,
 ) -> isize {
     phase_settings
         .iter()
         .permutations(phase_settings.len())
-        .map(|perm| func(&program, perm))
+        .map(|perm| func(program.clone(), perm))
         .max()
         .unwrap()
 }

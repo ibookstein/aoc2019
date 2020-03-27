@@ -23,8 +23,8 @@ enum Direction {
 }
 
 impl Direction {
-    fn turn(&self, to: Turn) -> Self {
-        match (*self, to) {
+    fn turn(self, to: Turn) -> Self {
+        match (self, to) {
             (Direction::Up, Turn::Right) | (Direction::Down, Turn::Left) => Direction::Right,
             (Direction::Up, Turn::Left) | (Direction::Down, Turn::Right) => Direction::Left,
             (Direction::Left, Turn::Right) | (Direction::Right, Turn::Left) => Direction::Up,
@@ -200,7 +200,7 @@ fn main() {
     board.run_robot();
     println!("Painted panels: {}", board.painted_panels());
 
-    let mut board = Board::new(Robot::new(program.clone()), PanelColor::White);
+    let mut board = Board::new(Robot::new(program), PanelColor::White);
     board.run_robot();
     println!(
         "Grid when origin starts colored white:\n{}",

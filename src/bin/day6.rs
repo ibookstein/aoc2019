@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 fn parse_line(line: &str) -> (&str, &str) {
     let items: Vec<_> = line.split(')').collect();
     match &items[..] {
-        &[s1, s2] => (s1, s2),
+        [s1, s2] => (s1, s2),
         _ => panic!("Malformed line"),
     }
 }
@@ -61,7 +61,7 @@ impl Graph {
         current_layer.insert(origin);
         let mut depth = 0usize;
 
-        while current_layer.len() != 0 {
+        while !current_layer.is_empty() {
             func(depth, &current_layer);
             let new_layer: VertexSet = current_layer
                 .iter()
