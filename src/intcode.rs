@@ -1,5 +1,7 @@
 use crate::digits::digits;
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub enum IntcodeError {
@@ -51,11 +53,12 @@ struct Opcode {
 pub type IntcodeResult<T> = Result<T, IntcodeError>;
 pub type Tape = Vec<isize>;
 pub type Stream = VecDeque<isize>;
+pub type StreamRef = Rc<RefCell<Stream>>;
 
 pub struct IntcodeMachine {
-    pub tape: Tape,
-    pub input: Stream,
-    pub output: Stream,
+    tape: Tape,
+    pub input: StreamRef,
+    pub output: StreamRef,
     pc: isize,
     bp: isize,
 }
@@ -70,14 +73,18 @@ fn parse_addressing_mode(digit: usize) -> IntcodeResult<AddressingMode> {
 }
 
 impl IntcodeMachine {
-    pub fn new(tape: Tape, input: Stream) -> IntcodeMachine {
+    pub fn new_io(tape: Tape, input: StreamRef, output: StreamRef) -> Self {
         IntcodeMachine {
             tape,
             input,
-            output: Stream::new(),
+            output,
             pc: 0,
             bp: 0,
         }
+    }
+
+    pub fn new(tape: Tape) -> Self {
+        Self::new_io(tape, new_stream_ref(), new_stream_ref())
     }
 
     fn verify_addr(&mut self, addr: isize) -> IntcodeResult<usize> {
@@ -92,7 +99,7 @@ impl IntcodeMachine {
         Ok(addr)
     }
 
-    fn read_addr(&mut self, addr: isize) -> IntcodeResult<isize> {
+    pub fn read_addr(&mut self, addr: isize) -> IntcodeResult<isize> {
         let addr = self.verify_addr(addr)?;
         Ok(self.tape[addr])
     }
@@ -183,7 +190,8 @@ impl IntcodeMachine {
                 self.store(&opcode.operands[2], value)?;
             }
             Operation::Input => {
-                match self.input.pop_front() {
+                let input = self.input.borrow_mut().pop_front();
+                match input {
                     Some(value) => self.store(&opcode.operands[0], value)?,
                     None => {
                         self.pc = start_pc;
@@ -193,7 +201,7 @@ impl IntcodeMachine {
             }
             Operation::Output => {
                 let value = self.load(&opcode.operands[0])?;
-                self.output.push_back(value);
+                self.output.borrow_mut().push_back(value);
             }
             Operation::JumpTrue => {
                 let condition = self.load(&opcode.operands[0])?;
@@ -243,6 +251,22 @@ impl IntcodeMachine {
             _ => Err(IntcodeError::DidNotRunToCompletion),
         }
     }
+}
+
+pub fn new_stream_ref() -> StreamRef {
+    Rc::new(RefCell::new(Stream::new()))
+}
+
+pub fn new_stream_ref_from(value: isize) -> StreamRef {
+    let s = new_stream_ref();
+    s.borrow_mut().push_back(value);
+    s
+}
+
+pub fn new_stream_ref_from_iter(iter: impl IntoIterator<Item = isize>) -> StreamRef {
+    let s = new_stream_ref();
+    s.borrow_mut().extend(iter);
+    s
 }
 
 pub fn parse_intcode_program(input: &str) -> Tape {

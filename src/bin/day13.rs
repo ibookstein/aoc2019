@@ -15,14 +15,14 @@ enum Tile {
     Ball = 4,
 }
 
-fn count_block_tiles(program: &Tape) -> usize {
-    let mut machine = IntcodeMachine::new(program.clone(), Stream::new());
+fn count_block_tiles(program: Tape) -> usize {
+    let mut machine = IntcodeMachine::new(program);
     machine
         .run_to_completion()
         .expect("Did not run to completion");
 
     let mut board = HashMap::<(isize, isize), Tile>::new();
-    for (x, y, b) in machine.output.iter().tuples() {
+    for (x, y, b) in machine.output.borrow().iter().tuples() {
         let key = (*x, *y);
         let value = Tile::from_isize(*b).expect("Bad tile number");
         board.insert(key, value);
@@ -35,5 +35,5 @@ fn main() {
     let input = get_input(13);
     let program = parse_intcode_program(&input);
 
-    println!("Block tiles count: {}", count_block_tiles(&program));
+    println!("Block tiles count: {}", count_block_tiles(program.clone()));
 }

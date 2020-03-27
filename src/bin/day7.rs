@@ -9,18 +9,10 @@ struct MachineState {
 }
 
 impl MachineState {
-    fn create_with_phase(program: &Tape, phase: isize) -> MachineState {
-        let mut input = Stream::new();
-        input.push_back(phase);
+    fn new(machine: IntcodeMachine) -> Self {
         MachineState {
-            machine: IntcodeMachine::new(program.clone(), input),
+            machine,
             status: StopStatus::Running,
-        }
-    }
-
-    fn pump_input_from(&mut self, stream: &mut Stream) {
-        while let Some(value) = stream.pop_front() {
-            self.machine.input.push_back(value);
         }
     }
 
@@ -29,47 +21,75 @@ impl MachineState {
     }
 }
 
-fn calculate_thruster_signal_linear(program: &Tape, phase_settings: Vec<&isize>) -> isize {
-    let mut signal = 0isize;
+struct Pipeline {
+    pipeline: Vec<MachineState>,
+}
 
-    for phase_setting in phase_settings {
-        let input = Stream::from_iter([*phase_setting, signal].iter().cloned());
-        let mut machine = IntcodeMachine::new(program.clone(), input);
-        machine
-            .run_to_completion()
-            .expect("Did not run to completion");
-        signal = machine.output[0];
+impl Pipeline {
+    fn new(
+        program: &Tape,
+        phase_settings: Vec<&isize>,
+        first_input: StreamRef,
+        last_output: StreamRef,
+    ) -> Self {
+        let mut streams = Vec::<StreamRef>::new();
+        for (i, setting) in phase_settings.iter().enumerate() {
+            let stream = if i == 0 {
+                first_input.clone()
+            } else {
+                new_stream_ref()
+            };
+            stream.borrow_mut().push_back(**setting);
+            streams.push(stream);
+        }
+        streams.push(last_output);
+
+        let mut pipeline = Vec::<MachineState>::new();
+        for w in streams.windows(2) {
+            let machine = IntcodeMachine::new_io(program.clone(), w[0].clone(), w[1].clone());
+            pipeline.push(MachineState::new(machine));
+        }
+
+        Pipeline { pipeline }
     }
 
+    fn completed(&self) -> bool {
+        return self
+            .pipeline
+            .iter()
+            .all(|ms| ms.status == StopStatus::Halted);
+    }
+
+    fn run_to_completion(&mut self) {
+        while !self.completed() {
+            for ms in self.pipeline.iter_mut() {
+                ms.resume();
+            }
+        }
+    }
+}
+
+fn calculate_thruster_signal_linear(program: &Tape, phase_settings: Vec<&isize>) -> isize {
+    let input = new_stream_ref();
+    let output = new_stream_ref();
+    let mut pipeline = Pipeline::new(program, phase_settings, input.clone(), output.clone());
+
+    input.borrow_mut().push_back(0);
+    pipeline.run_to_completion();
+
+    let signal = output.borrow_mut().pop_back().unwrap();
     signal
 }
 
 fn calculate_thruster_signal_feedback(program: &Tape, phase_settings: Vec<&isize>) -> isize {
-    let mut machine_states: Vec<_> = phase_settings
-        .iter()
-        .map(|&phase| MachineState::create_with_phase(&program, *phase))
-        .collect();
+    let inout = new_stream_ref();
+    let mut pipeline = Pipeline::new(program, phase_settings, inout.clone(), inout.clone());
 
-    let count = phase_settings.len();
-    machine_states[0].pump_input_from(&mut Stream::from(vec![0isize]));
+    inout.borrow_mut().push_back(0);
+    pipeline.run_to_completion();
 
-    while !machine_states
-        .iter()
-        .all(|ms| ms.status == StopStatus::Halted)
-    {
-        for i in 0..count {
-            let prev_idx = if i == 0 { count - 1 } else { i - 1 };
-            let mut prev_output: Stream =
-                machine_states[prev_idx].machine.output.drain(..).collect();
-
-            machine_states[i].pump_input_from(&mut prev_output);
-            machine_states[i].resume();
-        }
-    }
-
-    let last_out = &machine_states.last().unwrap().machine.output;
-    assert_eq!(last_out.len(), 1);
-    last_out[0]
+    let signal = inout.borrow_mut().pop_back().unwrap();
+    signal
 }
 
 fn calculate_max_thruster_signal(

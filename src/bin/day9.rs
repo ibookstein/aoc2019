@@ -2,15 +2,17 @@ use aoc2019::aoc_input::get_input;
 use aoc2019::intcode::*;
 
 fn run_boost(program: &Tape, mode: isize) {
-    let mut input = Stream::new();
-    input.push_back(mode);
-
-    let mut machine = IntcodeMachine::new(program.clone(), input);
+    let mut machine =
+        IntcodeMachine::new_io(program.clone(), new_stream_ref_from(mode), new_stream_ref());
     machine
         .run_to_completion()
         .expect("Failed running BOOST program to completion");
 
-    println!("BOOST(mode={}) program output: {:?}", mode, machine.output);
+    println!(
+        "BOOST(mode={}) program output: {:?}",
+        mode,
+        machine.output.borrow()
+    );
 }
 
 fn main() {

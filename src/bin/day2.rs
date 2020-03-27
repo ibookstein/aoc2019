@@ -6,13 +6,13 @@ fn run_program(original: &Tape, noun: isize, verb: isize) -> isize {
     tape[1] = noun;
     tape[2] = verb;
 
-    let mut machine = IntcodeMachine::new(tape, Stream::new());
+    let mut machine = IntcodeMachine::new(tape);
     match machine.run_to_completion() {
         Ok(_) => (),
         Err(err) => panic!("IntcodeMachine error: {:?}", err),
     }
 
-    machine.tape[0]
+    machine.read_addr(0).unwrap()
 }
 
 fn find_preimage(original: &Tape, preimage: isize) -> Option<(isize, isize)> {

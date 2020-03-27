@@ -99,22 +99,29 @@ struct Robot {
 impl Robot {
     fn new(program: Tape) -> Robot {
         Robot {
-            brain: IntcodeMachine::new(program, Stream::new()),
+            brain: IntcodeMachine::new(program),
             location: Coordinate::origin(),
             direction: Direction::Up,
         }
     }
 
+    fn feed_input(&mut self, value: isize) {
+        self.brain.input.borrow_mut().push_back(value);
+    }
+
+    fn read_output(&mut self) -> isize {
+        self.brain.output.borrow_mut().pop_front().unwrap()
+    }
+
     fn step(&mut self, location_color: PanelColor) -> RobotRunResult {
-        self.brain
-            .input
-            .push_back(location_color.to_isize().unwrap());
+        self.feed_input(location_color.to_isize().unwrap());
+
         match self.brain.run().unwrap() {
             StopStatus::Halted => RobotRunResult::Done,
             StopStatus::BlockedOnInput => {
-                let paint_request = self.brain.output.pop_front().unwrap();
+                let paint_request = self.read_output();
                 let paint_request = PanelColor::from_isize(paint_request).unwrap();
-                let turn = self.brain.output.pop_front().unwrap();
+                let turn = self.read_output();
 
                 self.direction = self.direction.turn(Turn::from_isize(turn).unwrap());
                 self.location += self.direction.into();
