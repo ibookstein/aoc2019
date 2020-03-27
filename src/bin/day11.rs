@@ -127,7 +127,6 @@ impl Robot {
                 self.location += self.direction.into();
                 RobotRunResult::Paint(paint_request)
             }
-            _ => unreachable!(),
         }
     }
 }

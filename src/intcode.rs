@@ -15,17 +15,18 @@ pub enum IntcodeError {
 
 #[derive(Debug, PartialEq)]
 pub enum StopStatus {
-    Running,
     Halted,
     BlockedOnInput,
 }
 
+#[derive(Debug)]
 enum AddressingMode {
     AbsoluteAddress,
     Immediate,
     BasePointerRelative,
 }
 
+#[derive(Debug)]
 struct Operand {
     mode: AddressingMode,
     value: isize,
@@ -45,6 +46,7 @@ enum Operation {
     Halt,
 }
 
+#[derive(Debug)]
 struct Opcode {
     operation: Operation,
     operands: Vec<Operand>,
@@ -55,6 +57,7 @@ pub type Tape = Vec<isize>;
 pub type Stream = VecDeque<isize>;
 pub type StreamRef = Rc<RefCell<Stream>>;
 
+#[derive(Debug)]
 pub struct IntcodeMachine {
     tape: Tape,
     pub input: StreamRef,
@@ -176,7 +179,7 @@ impl IntcodeMachine {
         Ok(())
     }
 
-    fn tick(&mut self) -> IntcodeResult<StopStatus> {
+    fn tick(&mut self) -> IntcodeResult<Option<StopStatus>> {
         let start_pc = self.pc;
         let opcode = self.read_opcode()?;
 
@@ -195,7 +198,7 @@ impl IntcodeMachine {
                     Some(value) => self.store(&opcode.operands[0], value)?,
                     None => {
                         self.pc = start_pc;
-                        return Ok(StopStatus::BlockedOnInput);
+                        return Ok(Some(StopStatus::BlockedOnInput));
                     }
                 };
             }
@@ -228,18 +231,18 @@ impl IntcodeMachine {
             }
             Operation::Halt => {
                 self.pc = start_pc;
-                return Ok(StopStatus::Halted);
+                return Ok(Some(StopStatus::Halted));
             }
         };
 
-        Ok(StopStatus::Running)
+        Ok(None)
     }
 
     pub fn run(&mut self) -> IntcodeResult<StopStatus> {
         loop {
             match self.tick() {
-                Ok(StopStatus::Running) => continue,
-                Ok(status) => return Ok(status),
+                Ok(None) => continue,
+                Ok(Some(status)) => return Ok(status),
                 Err(e) => return Err(e),
             }
         }

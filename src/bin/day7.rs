@@ -12,7 +12,7 @@ impl MachineState {
     fn new(machine: IntcodeMachine) -> Self {
         MachineState {
             machine,
-            status: StopStatus::Running,
+            status: StopStatus::BlockedOnInput,
         }
     }
 
